@@ -162,29 +162,34 @@ func (m model) View() string {
 // if the pub key matches the one that we authenticated with and the filename
 // matches the user that signed in, we are authenticated, if not, result if false
 func authenticate(s ssh.Session) bool {
-	// TODO working here
 	files, err := ioutil.ReadDir("./keys")
 	if err != nil {
 		log.Println("Could not read key directory")
 		log.Println(err)
 		return false
 	}
+	pubKeyFilename := fmt.Sprintf("%s.pub", s.User())
+	log.Println(s.PublicKey())
 	for _, file := range files {
 		if file.IsDir() {
 			continue
 		}
-		if file.Name() == s.User() {
-			contents, err := os.ReadFile(file.Name())
+		log.Println(file.Name())
+		if file.Name() == pubKeyFilename {
+			log.Println("found a match")
+			contents, err := os.ReadFile(fmt.Sprintf("./keys/%s", file.Name()))
 			if err != nil {
-				log.Println("Could not read %s - %s", file.Name(), err)
+				log.Printf("Could not read %s - %s", file.Name(), err)
 				continue
 			}
-			thisPublicKey, err := ssh.ParsePublicKey(contents)
+			log.Println(contents)
+			thisPublicKey, _, _, _, err := ssh.ParseAuthorizedKey(contents)
 			if err != nil {
-				log.Println("Could not parse key from %s - %s", file.Name(), err)
+				log.Printf("Could not parse key from %s - %s", file.Name(), err)
 				continue
 			}
 			if ssh.KeysEqual(s.PublicKey(), thisPublicKey) {
+				log.Println("match")
 				return true
 			}
 		}
@@ -236,6 +241,21 @@ func main() {
 		wish.WithMiddleware(
 			bm.Middleware(teaHandler),
 			lm.Middleware(),
+			func(h ssh.Handler) ssh.Handler {
+				return func(s ssh.Session) {
+					carlos, _, _, _, _ := ssh.ParseAuthorizedKey(
+						[]byte("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOZ/NkruEpZxh+o/dUuQaR7NOzgFJCYcXnkKOJwtL4b3"),
+					)
+					switch {
+					case ssh.KeysEqual(s.PublicKey(), carlos):
+						wish.Println(s, "Hey Carlos!")
+					default:
+						wish.Println(s, "Hey, I don't know who you are!")
+						log.Println("don't you see this?")
+					}
+					h(s)
+				}
+			},
 		),
 	)
 	if err != nil {
