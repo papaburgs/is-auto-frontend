@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
@@ -162,36 +161,53 @@ func (m model) View() string {
 // if the pub key matches the one that we authenticated with and the filename
 // matches the user that signed in, we are authenticated, if not, result if false
 func authenticate(s ssh.Session) bool {
-	files, err := ioutil.ReadDir("./keys")
-	if err != nil {
-		log.Println("Could not read key directory")
-		log.Println(err)
+	/*
+		files, err := ioutil.ReadDir("./keys")
+		if err != nil {
+			log.Println("Could not read key directory")
+			log.Println(err)
+			return false
+		}
+		pubKeyFilename := fmt.Sprintf("%s.pub", s.User())
+		log.Println(s.PublicKey())
+		for _, file := range files {
+			if file.IsDir() {
+				continue
+			}
+			log.Println(file.Name())
+			if file.Name() == pubKeyFilename {
+				log.Println("found a match")
+				contents, err := os.ReadFile(fmt.Sprintf("./keys/%s", file.Name()))
+				if err != nil {
+					log.Printf("Could not read %s - %s", file.Name(), err)
+					continue
+				}
+				log.Println(contents)
+				thisPublicKey, _, _, _, err := ssh.ParseAuthorizedKey(contents)
+				if err != nil {
+					log.Printf("Could not parse key from %s - %s", file.Name(), err)
+					continue
+				}
+				if ssh.KeysEqual(s.PublicKey(), thisPublicKey) {
+					log.Println("match")
+					return true
+				}
+			}
+		}
 		return false
+	*/
+	keys := []string{
+		"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOZ/NkruEpZxh+o/dUuQaR7NOzgFJCYcXnkKOJwtL4b3 olsod2@slc1053333.stholdco.com",
 	}
-	pubKeyFilename := fmt.Sprintf("%s.pub", s.User())
-	log.Println(s.PublicKey())
-	for _, file := range files {
-		if file.IsDir() {
+	for keyIndex, key := range keys {
+		thisPublicKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(strings.TrimSpace(key)))
+		if err != nil {
+			log.Printf("Could not parse key from at index %v", keyIndex)
 			continue
 		}
-		log.Println(file.Name())
-		if file.Name() == pubKeyFilename {
-			log.Println("found a match")
-			contents, err := os.ReadFile(fmt.Sprintf("./keys/%s", file.Name()))
-			if err != nil {
-				log.Printf("Could not read %s - %s", file.Name(), err)
-				continue
-			}
-			log.Println(contents)
-			thisPublicKey, _, _, _, err := ssh.ParseAuthorizedKey(contents)
-			if err != nil {
-				log.Printf("Could not parse key from %s - %s", file.Name(), err)
-				continue
-			}
-			if ssh.KeysEqual(s.PublicKey(), thisPublicKey) {
-				log.Println("match")
-				return true
-			}
+		if ssh.KeysEqual(s.PublicKey(), thisPublicKey) {
+			log.Println("match")
+			return true
 		}
 	}
 	return false
